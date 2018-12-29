@@ -1,6 +1,7 @@
 ﻿namespace CuisineScraper
 {
     using AngleSharp;
+    using AngleSharp.Dom;
     using CsvHelper;
     using System;
     using System.Collections.Concurrent;
@@ -13,50 +14,58 @@
     {
         private static async Task Main()
         {
-            var pages = new Dictionary<string, string>
+            var webPagesAndSelectors = new Dictionary<string, string>
             {
                 ["http://www.cuisinedenotreterroirfrancais.com/termes2.php"] = "table:nth-child(27) , table:nth-child(22), table:nth-child(19), table:nth-child(15)",
                 ["http://www.cuisinedenotreterroirfrancais.com/termes-culinaires-page-2.php"] = "table:nth-child(20) , table:nth-child(24), table:nth-child(16), table:nth-child(8), table:nth-child(12)",
                 ["http://www.cuisinedenotreterroirfrancais.com/thermes-culinaires-page-3.php"] = "table:nth-child(9) , table:nth-child(13), table:nth-child(17), table:nth-child(21), table:nth-child(25), :nth-child(29), :nth-child(33), :nth-child(36), :nth-child(40), table:nth-child(44)"
             };
 
+            var records = await GetRecordsAsync(webPagesAndSelectors).ConfigureAwait(false);
+
             using (TextWriter textWriter = new StreamWriter(@".\output.csv"))
             using (CsvWriter csv = new CsvWriter(textWriter))
             {
                 csv.Configuration.HasHeaderRecord = false;
-                csv.WriteRecords(await GetList(pages).ConfigureAwait(false));
+                csv.WriteRecords(records);
             }
         }
 
-        private static async Task<ConcurrentBag<Tuple<string, string>>> GetList(Dictionary<string, string> pages)
+        private static async Task<ConcurrentBag<Tuple<string, string>>> GetRecordsAsync(Dictionary<string, string> webPagesAndSelectors)
         {
             var angleConfig = Configuration.Default.WithDefaultLoader();
-            var termesList = new ConcurrentBag<Tuple<string, string>>();
+            var records = new ConcurrentBag<Tuple<string, string>>();
 
-            var tasks = pages.Select(async page =>
+            var tasks = webPagesAndSelectors.Select(async pageAndSelector =>
             {
-                var document = await BrowsingContext.New(angleConfig).OpenAsync(page.Key).ConfigureAwait(false);
+                var document = await BrowsingContext.New(angleConfig).OpenAsync(pageAndSelector.Key).ConfigureAwait(false);
 
-                foreach (var table in document.DocumentElement.QuerySelectorAll(page.Value))
+                foreach (var table in document.DocumentElement.QuerySelectorAll(pageAndSelector.Value))
                 {
-                    var tablesOfTheFirstTable = table.QuerySelectorAll("td")
+                    var dataframe = table.QuerySelectorAll("td")
                         .Select((x, i) => new { Index = i, Value = x })
                         .GroupBy(x => x.Index % 2 == 0)
                         .Select(x => x.Where(v => !string.IsNullOrWhiteSpace(v.Value.TextContent))
                         .Select(v => v.Value))
                         .ToList();
 
-                    foreach (var line in Enumerable.Range(0, tablesOfTheFirstTable[0].Count()))
+                    var totalRows = dataframe[0].Count();
+                    for (var rowNumber = 0; rowNumber < totalRows; rowNumber++)
                     {
-                        termesList.Add(Tuple.Create(tablesOfTheFirstTable[0].Skip(line).First().TextContent.Trim(),
-                                                    tablesOfTheFirstTable[1].Skip(line).First().TextContent.Trim()));
+                        records.Add(GetRow(dataframe, rowNumber));
                     }
                 }
             });
 
             await Task.WhenAll(tasks).ConfigureAwait(false);
 
-            return termesList;
+            return records;
+        }
+
+        private static Tuple<string, string> GetRow(List<IEnumerable<IElement>> column, int rowNumber)
+        {
+            return Tuple.Create(column[0].Skip(rowNumber).First().TextContent.Trim(),
+                                column.Last().Skip(rowNumber).First().TextContent.Trim());
         }
     }
 }
