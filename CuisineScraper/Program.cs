@@ -1,9 +1,9 @@
 ﻿namespace CuisineScraper
 {
     using AngleSharp;
-    using AngleSharp.Dom;
     using CsvHelper;
     using System;
+    using System.Collections.Concurrent;
     using System.Collections.Generic;
     using System.IO;
     using System.Linq;
@@ -20,13 +20,22 @@
                 ["http://www.cuisinedenotreterroirfrancais.com/thermes-culinaires-page-3.php"] = "table:nth-child(9) , table:nth-child(13), table:nth-child(17), table:nth-child(21), table:nth-child(25), :nth-child(29), :nth-child(33), :nth-child(36), :nth-child(40), table:nth-child(44)"
             };
 
-            var angleConfig = Configuration.Default.WithDefaultLoader();
-
-            var termesList = new List<Tuple<string, string>>();
-
-            foreach (var page in pages)
+            using (TextWriter textWriter = new StreamWriter(@".\output.csv"))
+            using (CsvWriter csv = new CsvWriter(textWriter))
             {
-                IDocument document = await BrowsingContext.New(angleConfig).OpenAsync(page.Key).ConfigureAwait(false);
+                csv.Configuration.HasHeaderRecord = false;
+                csv.WriteRecords(await GetList(pages).ConfigureAwait(false));
+            }
+        }
+
+        private static async Task<ConcurrentBag<Tuple<string, string>>> GetList(Dictionary<string, string> pages)
+        {
+            var angleConfig = Configuration.Default.WithDefaultLoader();
+            var termesList = new ConcurrentBag<Tuple<string, string>>();
+
+            var tasks = pages.Select(async page =>
+            {
+                var document = await BrowsingContext.New(angleConfig).OpenAsync(page.Key).ConfigureAwait(false);
 
                 foreach (var table in document.DocumentElement.QuerySelectorAll(page.Value))
                 {
@@ -43,14 +52,11 @@
                                                     tablesOfTheFirstTable[1].Skip(line).First().TextContent.Trim()));
                     }
                 }
-            }
+            });
 
-            using (TextWriter textWriter = new StreamWriter(@".\output.csv"))
-            using (CsvWriter csv = new CsvWriter(textWriter))
-            {
-                csv.Configuration.HasHeaderRecord = false;
-                csv.WriteRecords(termesList);
-            }
+            await Task.WhenAll(tasks).ConfigureAwait(false);
+
+            return termesList;
         }
     }
 }
