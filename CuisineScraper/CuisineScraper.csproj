@@ -6,8 +6,8 @@
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <ProjectGuid>{80897C1A-0A44-43F7-99E4-BB64BF743C12}</ProjectGuid>
     <OutputType>Exe</OutputType>
-    <RootNamespace>CuisineScrapper</RootNamespace>
-    <AssemblyName>CuisineScrapper</AssemblyName>
+    <RootNamespace>CuisineScraper</RootNamespace>
+    <AssemblyName>CuisineScraper</AssemblyName>
     <TargetFrameworkVersion>v4.6.1</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
