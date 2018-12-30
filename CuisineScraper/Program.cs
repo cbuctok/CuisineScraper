@@ -2,13 +2,16 @@
 {
     using AngleSharp;
     using AngleSharp.Dom;
+    using AngleSharp.Dom.Html;
     using CsvHelper;
     using System;
     using System.Collections.Concurrent;
     using System.Collections.Generic;
     using System.IO;
     using System.Linq;
+    using System.Net;
     using System.Threading.Tasks;
+    using System.Xml.Linq;
 
     internal static class Program
     {
@@ -64,8 +67,43 @@
 
         private static Tuple<string, string> GetRow(List<IEnumerable<IElement>> column, int rowNumber)
         {
-            return Tuple.Create(column[0].Skip(rowNumber).First().TextContent.Trim(),
-                                column.Last().Skip(rowNumber).First().TextContent.Trim());
+            var firstColumn = column[0].Skip(rowNumber).First();
+            var secondColumn = column[1].Skip(rowNumber).First();
+
+            return Tuple.Create(ExtractColumn(firstColumn), ExtractColumn(secondColumn));
+        }
+
+        private static string ExtractColumn(IElement column)
+        {
+            var columnText = column.TextContent.Trim();
+            var columnImage = column.QuerySelectorAll("a");
+
+            if (!columnImage.Any())
+            {
+                return columnText;
+            }
+
+            var imagesRoot = new XElement("div");
+            foreach (var el in columnImage?.OfType<IHtmlAnchorElement>())
+            {
+                var imageUrl = new Uri(el.Href);
+                var fileName = Path.GetFileName(imageUrl.LocalPath);
+
+                CreateFile(imageUrl, fileName);
+                imagesRoot.Add(new XElement("img", new XAttribute("src", fileName)));
+            }
+            return $"{columnText}<br>{imagesRoot.ToString(SaveOptions.DisableFormatting)}".Replace('"', '\'');
+        }
+
+        private static void CreateFile(Uri imageUrl, string fileName)
+        {
+            if (!File.Exists(fileName))
+            {
+                using (var myWebClient = new WebClient())
+                {
+                    myWebClient.DownloadFile(imageUrl, fileName);
+                }
+            }
         }
     }
 }
