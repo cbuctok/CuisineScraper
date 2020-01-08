@@ -34,10 +34,10 @@
             }
         }
 
-        private static async Task<ConcurrentBag<Tuple<string, string>>> GetRecordsAsync(Dictionary<string, string> webPagesAndSelectors)
+        private static async Task<ConcurrentBag<(string, string)>> GetRecordsAsync(Dictionary<string, string> webPagesAndSelectors)
         {
             var angleConfig = Configuration.Default.WithDefaultLoader();
-            var records = new ConcurrentBag<Tuple<string, string>>();
+            var records = new ConcurrentBag<(string, string)>();
 
             var tasks = webPagesAndSelectors.Select(async pageAndSelector =>
             {
@@ -65,12 +65,12 @@
             return records;
         }
 
-        private static Tuple<string, string> GetRow(List<IEnumerable<IElement>> column, int rowNumber)
+        private static (string, string) GetRow(List<IEnumerable<IElement>> column, int rowNumber)
         {
             var firstColumn = column[0].Skip(rowNumber).First();
             var secondColumn = column[1].Skip(rowNumber).First();
 
-            return Tuple.Create(ExtractColumn(firstColumn), ExtractColumn(secondColumn));
+            return (ExtractColumn(firstColumn), ExtractColumn(secondColumn));
         }
 
         private static string ExtractColumn(IElement column)
